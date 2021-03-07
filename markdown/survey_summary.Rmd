@@ -1,0 +1,481 @@
+---
+title: "Survey Data Summary"
+author: "Elsie Horne"
+date: "07/02/2021"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, include = FALSE)
+```
+
+```{r set_directory}
+directory <- '/Users/elsiehorne/Docs/auk_survey_segmentation'
+```
+
+
+```{r load_setup}
+source(file.path(directory, 'setup.R'))
+corr_plot_path <- file.path(results_path, 'corr_plots')
+```
+
+```{r update_corr_plots}
+update_corr_plots <- TRUE
+```
+
+```{r functions}
+source(file.path(functions_path, 'combine_likert.R'))
+source(file.path(functions_path, 'corr_plot.R'))
+```
+
+```{r data}
+data_clean <- readRDS(file = file.path(data_path, 'data_clean.RDS'))
+survey_key <- readRDS(file = file.path(data_path, 'survey_key.RDS'))
+likert_list <- readRDS(file = file.path(data_path, 'likert_list.RDS'))
+```
+
+```{r likert_levs}
+likert_levs <- c(likert_list$likert_levs, 'skip', 'NA')
+```
+
+```{r my_summary}
+my_summary <- function(data) {
+  print.tbl_df <- function(x, ...) {
+  print.data.frame(x, ...)
+  invisible(x)
+}
+  vars <- names(data)[-which(names(data) == 'RecordNo')]
+for (v in vars) {
+  survey_key %>%
+    filter(variable_label %in% v) %>%
+    transmute(survey_question = str_c(survey_question, '\n')) %>%
+    unlist() %>%
+    unname() %>% 
+    cat()
+  
+  data %>%
+    group_by_at(v) %>%
+    count() %>%
+    ungroup() %>%
+    mutate(percent = str_c('(', round(100*n/sum(n),0), '%)')) %>%
+    # as.data.frame() %>%
+    print(row.names = FALSE)
+  
+  cat('\n')
+}
+}
+```
+
+# Intro
+
+## Cleaning
+If a question was skipped, the category is 'skip'.
+For logic questions, respondents for whom the question is not relevant are categorised as 'NA'.
+
+Some reponses on likert scales (strongly disagree -> strongly agree / rarely -> always) had very few survey respondents selecting a certain response.
+Therefore I grouped responses as follows:
+
+- If 'skip' < 5%, combine 'skip' with 'netrual'
+- If 'strongly disagree' + 'disagree' < 5%, combine both with 'neutral'
+- If 'strongly disagree' < 5% and 'strongly disagree' + 'disagree' >= 5%, combine 'strongly disagree' with 'disagree'
+- If 'strongly agree' + 'agree' < 5%, combine both with 'neutral'
+- If 'strongly agree' < 5% and 'strongly agree' + 'agree' >= 5%, combine 'strongly agree' with 'agree' 
+
+Note that for now I have not grouped the likert responses in section D, as all of these are logic questions and so have a smaller denominator.
+If these questions are included in the analysis, I would group them using the above methods.
+
+Due to time restrictions, I have not yet cleaned section H or the demographic questions, as (if I undestand correctly) these will all be descriptive variables.
+
+## Summary tables
+I have truncated some responses so that they fit on the page.
+
+## Correlation plot
+I used Kendall's rank correlation for these plots.
+The colour of the tile corresponds to the correlation value - i.e. red equals positive correlation, blue indicates negeative correlation, and yellow indicates no correlation.
+
+As Kendall's rank correlation requires that the variables are ordered, I removed the 'NA' and 'skip' categories from each variable when calculating the correlation, as these do not have an inherent ordering.
+For variables with a high proportion of 'NA' or 'skip' categories, this could mean that the correlation is based on very few samples - this information is available in the summary tables.
+Otherwise, the ordering of the categories is as it appears in the summary tables.
+
+In some of the plots there are greyed out boxes.
+This corresponds to the case when one of the two variables only takes one category.
+For example, in section C, asthma_manage_3 vs asthma_manage_mart cannot be calculated, as when asthma_manage_mart is not 'NA' or 'skip',  asthma_manage_3 must always be 'yes'.
+
+# Section A
+
+```{r data_A, include = TRUE}
+my_summary(data = data_clean %>% select(RecordNo, starts_with('asthma_diagnosis')))
+```
+\newpage
+
+# Section B1
+
+```{r data_B1, include = TRUE}
+data_B1 <- data_clean %>% 
+  select(RecordNo, health_con1:man_envir) 
+my_summary(data_B1)
+```
+
+```{r corr_plot_B1, include = TRUE, fig_width = 12, fig_height = 14, message=FALSE}
+if (update_corr_plots) {
+corr_plot(data_B1)
+}
+knitr::include_graphics(file.path(corr_plot_path, 'data_B1_corrplot.png'))
+```
+\newpage
+
+# Section B2
+
+```{r data_B2, include = TRUE}
+data_B2 <- data_clean %>% select(RecordNo, asthma_control1:asthma_control3_5)
+my_summary(data_B2)
+```
+
+```{r corr_plot_B2, include = TRUE, fig_width = 12, fig_height = 14, message=FALSE}
+if (update_corr_plots) {
+corr_plot(data_B2)
+}
+knitr::include_graphics(file.path(corr_plot_path, 'data_B2_corrplot.png'))
+```
+\newpage
+
+# Section C
+
+```{r data_C, include = TRUE}
+data_C <- data_clean %>% select(RecordNo, asthma_manage_1:mart_freq3)
+my_summary(data_C)
+```
+
+```{r corr_plot_C, include = TRUE, fig_width = 12, fig_height = 14, message=FALSE}
+if (update_corr_plots) {
+corr_plot(data_C)
+}
+knitr::include_graphics(file.path(corr_plot_path, 'data_C_corrplot.png'))
+```
+\newpage
+
+
+```{r data_D}
+data_D <- data_clean %>%
+  select(RecordNo, 
+         asthma_manage_1, asthma_manage_2, asthma_manage_3, asthma_manage_mart,
+         rel_knowledge1:mart_emot2)  %>%
+  mutate_at(vars(prev_knowledge1:mart_emot2), 
+            list(~ factor(., 
+                          levels = likert_levs)))
+```
+
+# Section D: preventer
+
+```{r D_prev_skip, include = TRUE}
+tmp_D <- data_D %>%
+  filter(asthma_manage_2 %in% 'yes') %>% 
+  select(starts_with('prev')) 
+all <- tmp_D %>% nrow()
+all_skip <- tmp_D %>%
+  filter_all(all_vars(. %in% 'skip')) %>% 
+  nrow()
+cat(str_c(round(100*all_skip/all,0), '% of respondents with a preventer inhaler skipped all questions in this section.'))
+``` 
+
+Note that the following tables (and percent calculations) only include respondents who reported having a preventer inhaler.
+
+```{r D_prev}
+data_D_preventer <- data_D %>%
+  select(RecordNo, starts_with('prev'))
+```
+
+```{r D_prev_summary, include = TRUE}
+my_summary(data_D %>%
+  filter(asthma_manage_2 %in% 'yes') %>% 
+  select(RecordNo, starts_with('prev')))
+```
+
+```{r corr_plot_D_prev, include = TRUE, fig_width = 12, fig_height = 14, message=FALSE}
+if (update_corr_plots) {
+corr_plot(data_D_preventer)
+}
+knitr::include_graphics(file.path(corr_plot_path, 'data_D_preventer_corrplot.png'))
+```
+
+# Section D: reliever
+
+```{r D_rel_skip, include = TRUE}
+tmp_D <- data_D %>%
+  filter(asthma_manage_1 %in% 'yes') %>% 
+  select(starts_with('rel')) 
+all <- tmp_D %>% nrow()
+all_skip <- tmp_D %>%
+  filter_all(all_vars(. %in% 'skip')) %>% 
+  nrow()
+cat(str_c(round(100*all_skip/all,0), '% of respondents with a reliever inhaler skipped all questions in this section.'))
+``` 
+
+Note that the following tables (and percent calculations) only include respondents who reported having a reliever inhaler.
+
+```{r D_rel, include = TRUE}
+data_D_reliever <- data_D %>%
+  select(RecordNo, starts_with('rel'))
+my_summary(data_D %>%
+  filter(asthma_manage_1 %in% 'yes') %>% 
+  select(RecordNo, starts_with('rel')))
+```
+
+```{r corr_plot_D_rel, include = TRUE, fig_width = 12, fig_height = 14, message=FALSE}
+if (update_corr_plots) {
+corr_plot(data_D_reliever)
+}
+knitr::include_graphics(file.path(corr_plot_path, 'data_D_reliever_corrplot.png'))
+```
+
+# Section D: combi
+
+```{r D_combi_skip, include = TRUE}
+tmp_D <- data_D %>%
+  filter(asthma_manage_3 %in% 'yes',
+         !(asthma_manage_mart %in% 'yes')) %>% 
+  select(starts_with('combi'))
+all <- tmp_D %>% nrow()
+all_skip <- tmp_D %>%
+  filter_all(all_vars(. %in% 'skip')) %>% 
+  nrow()
+cat(str_c(round(100*all_skip/all,0), '% of respondents with a combination inhaler skipped all questions in this section.'))
+``` 
+
+Note that the following tables (and percent calculations) only include respondents who reported having a combination inhaler but not having a MART inhaler.
+
+```{r D_combi, include = TRUE}
+data_D_combi <- data_D %>%
+  select(RecordNo, starts_with('combi'))
+my_summary(data_D %>%
+  filter(asthma_manage_3 %in% 'yes',
+         !(asthma_manage_mart %in% 'yes')) %>% 
+  select(RecordNo, starts_with('combi')))
+```
+
+```{r corr_plot_D_combi, include = TRUE, fig_width = 12, fig_height = 14, message=FALSE}
+if (update_corr_plots) {
+corr_plot(data_D_combi)
+}
+knitr::include_graphics(file.path(corr_plot_path, 'data_D_combi_corrplot.png'))
+```
+
+# Section D: MART
+
+```{r D_mart_skip, include = TRUE}
+tmp_D <- data_D %>%
+  filter(asthma_manage_mart %in% 'yes') %>% 
+  select(RecordNo, starts_with('mart'))
+all <- tmp_D %>% nrow()
+all_skip <- tmp_D %>%
+  filter_all(all_vars(. %in% 'skip')) %>% 
+  nrow()
+cat(str_c(round(100*all_skip/all,0), '% of respondents with a MART inhaler skipped all questions in this section.'))
+``` 
+
+Note that the following tables (and percent calculations) only include respondents who reported having a MART inhaler.
+
+```{r D_mart, include = TRUE}
+data_D_mart <- data_D %>%
+  select(RecordNo, starts_with('mart'))
+my_summary(data_D %>%
+  filter(asthma_manage_mart %in% 'yes') %>% 
+  select(RecordNo, starts_with('mart')))
+```
+
+```{r corr_plot_D_mart, include = TRUE, fig_width = 12, fig_height = 14, message=FALSE}
+if (update_corr_plots) {
+corr_plot(data_D_mart)
+}
+knitr::include_graphics(file.path(corr_plot_path, 'data_D_mart_corrplot.png'))
+```
+\newpage
+
+## Section E1
+
+```{r data_E1, include = TRUE}
+data_E1 <- data_clean %>%
+  select(RecordNo, asthma_control1, asthma_review_freq:info_seeking_sources_11) %>%
+  select(-asthma_control1) 
+
+my_summary(data_E1)
+```
+
+Notes for the correlation plot:
+
+- 'asthma_review_reasons' was removed as there was no clear ordering
+- the 'not applicable – i have nev...' level was removed from 'asthma_review_freq' as it did not fit into the ordering
+
+```{r corr_plot_E1, include = TRUE, fig_width = 12, fig_height = 14, message=FALSE}
+if (update_corr_plots) {
+data_E1_tmp <- data_E1
+data_E1 <- data_E1 %>%
+  mutate_at('asthma_review_freq',
+            list(~ factor(if_else(str_detect(as.character(.), 'not applicable'), 
+                                  'NA', 
+                                  as.character(.)),
+                          levels = c('less than once a year',
+                                     'once a year',
+                                     'more than once a year',
+                                     'NA',
+                                     'skip')))) %>%
+  select(-asthma_review_reasons)
+corr_plot(data_E1)
+data_E1 <- data_E1_tmp
+rm(data_E1_tmp)
+}
+knitr::include_graphics(file.path(corr_plot_path, 'data_E1_corrplot.png'))
+```
+\newpage
+
+# Section E2
+
+```{r data_E2, include = TRUE}
+data_E2 <- data_clean %>%
+  select(RecordNo, support_cap1:knowledge_check4) 
+my_summary(data_E2)
+```
+
+```{r corr_plot_E2, include = TRUE, fig_width = 12, fig_height = 14, message=FALSE}
+if (update_corr_plots) {
+corr_plot(data_E2)
+}
+knitr::include_graphics(file.path(corr_plot_path, 'data_E2_corrplot.png'))
+```
+\newpage
+
+# Section F1
+
+```{r data_F1, include = TRUE}
+data_F1 <- data_clean %>%
+  select(RecordNo, monitor_how_1:monitor_when) 
+
+my_summary(data_F1)
+```
+
+```{r corr_plot_F1, include = TRUE, fig_width = 12, fig_height = 14, message=FALSE}
+if (update_corr_plots) {
+corr_plot(data_F1)
+}
+knitr::include_graphics(file.path(corr_plot_path, 'data_F1_corrplot.png'))
+```
+
+# Section F2
+
+```{r data_F2, include = TRUE}
+data_F2 <- data_clean %>%
+  select(RecordNo, monitor_how_8, self_mon_knowledge:selfmon_emot2) 
+my_summary(data_F2)
+```
+
+```{r corr_plot_F2, include = TRUE, fig_width = 12, fig_height = 14, message=FALSE}
+if (update_corr_plots) {
+corr_plot(data_F2)
+}
+knitr::include_graphics(file.path(corr_plot_path, 'data_F2_corrplot.png'))
+```
+\newpage
+
+```{r data_G}
+data_G <- data_clean %>%
+  select(RecordNo, internet_freq1:device_reasons_grid6_99) 
+```
+
+# Section G: frequencies
+
+```{r G_freq, include = TRUE}
+data_G_freq <- data_G %>% select(RecordNo, contains('freq'))
+my_summary(data_G_freq)
+```
+
+```{r corr_plot_G_freq, include = TRUE, fig_width = 12, fig_height = 14, message=FALSE}
+if (update_corr_plots) {
+corr_plot(data_G_freq)
+}
+knitr::include_graphics(file.path(corr_plot_path, 'data_G_freq_corrplot.png'))
+```
+
+# Section G: smartphone
+
+```{r G_smartphone, include = TRUE}
+data_G_smartphone <- data_G %>% select(RecordNo, device_freq1, starts_with('device_reasons_grid1'))
+my_summary(data_G_smartphone)
+```
+
+```{r corr_plot_G_smartphone, include = TRUE, fig_width = 12, fig_height = 14, message=FALSE}
+if (update_corr_plots) {
+corr_plot(data_G_smartphone)
+}
+knitr::include_graphics(file.path(corr_plot_path, 'data_G_smartphone_corrplot.png'))
+```
+
+# Section G: smartwatch
+
+```{r G_smartwatch, include = TRUE}
+data_G_smartwatch <- data_G %>% select(RecordNo, device_freq2, starts_with('device_reasons_grid2'))
+my_summary(data_G_smartwatch)
+```
+
+```{r corr_plot_G_smartwatch, include = TRUE, fig_width = 12, fig_height = 14, message=FALSE}
+if (update_corr_plots) {
+corr_plot(data_G_smartwatch)
+}
+knitr::include_graphics(file.path(corr_plot_path, 'data_G_smartwatch_corrplot.png'))
+```
+
+# Section G: smartmeter
+
+```{r G_smartmeter, include = TRUE}
+data_G_smartmeter <- data_G %>% select(RecordNo, device_freq3, starts_with('device_reasons_grid3'))
+my_summary(data_G_smartmeter)
+```
+
+```{r corr_plot_G_smartmeter, include = TRUE, fig_width = 12, fig_height = 14, message=FALSE}
+if (update_corr_plots) {
+corr_plot(data_G_smartmeter)
+}
+knitr::include_graphics(file.path(corr_plot_path, 'data_G_smartmeter_corrplot.png'))
+```
+
+# Section G: smart other
+
+```{r G_smartother, include = TRUE}
+data_G_smartother <- data_G %>% select(RecordNo, device_freq4, starts_with('device_reasons_grid4'))
+my_summary(data_G_smartother)
+```
+
+```{r corr_plot_G_smartother, include = TRUE, fig_width = 12, fig_height = 14, message=FALSE}
+if (update_corr_plots) {
+corr_plot(data_G_smartother)
+}
+knitr::include_graphics(file.path(corr_plot_path, 'data_G_smartother_corrplot.png'))
+```
+
+# Section G: voice assistant
+
+```{r G_voiceassistant, include = TRUE}
+data_G_voiceassistant <- data_G %>% select(RecordNo, device_freq5, starts_with('device_reasons_grid5'))
+my_summary(data_G_voiceassistant)
+```
+
+```{r corr_plot_G_voiceassistant, include = TRUE, fig_width = 12, fig_height = 14, message=FALSE}
+if (update_corr_plots) {
+corr_plot(data_G_voiceassistant)
+}
+knitr::include_graphics(file.path(corr_plot_path, 'data_G_voiceassistant_corrplot.png'))
+```
+
+# Section G: virtual reality
+
+```{r G_virtualreality, include = TRUE}
+data_G_virtualreality <- data_G %>% select(RecordNo, device_freq6, starts_with('device_reasons_grid6'))
+my_summary(data_G_virtualreality)
+```
+
+```{r corr_plot_G_virtualreality, include = TRUE, fig_width = 12, fig_height = 14, message=FALSE}
+if (update_corr_plots) {
+corr_plot(data_G_virtualreality)
+}
+knitr::include_graphics(file.path(corr_plot_path, 'data_G_virtualreality_corrplot.png'))
+```
+

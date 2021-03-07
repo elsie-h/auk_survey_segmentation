@@ -1,0 +1,13 @@
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+.DS_Store
+
+# file types to ignore
+*.png
+*.csv
+*.RDS
+*.sav
+*.xlsx
+*.docx
