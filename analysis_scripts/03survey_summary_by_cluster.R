@@ -1,4 +1,4 @@
-# summarise all variables by adherence groups
+# summary plots for all variables by adherence groups and section clusters (optional)
 
 # For each of the adherence subgroups, identify section-specific clusters
 # Plot a summary of the section variables each of the section clusters
@@ -13,10 +13,6 @@ data_section_clusters <- readRDS(file = file.path(results_path, 'section_cluster
 source(file.path(functions_path, 'combine_likert.R'))
 source(file.path(functions_path, 'my_line_plot.R'))
 source(file.path(functions_path, 'section_bar_plot.R'))
-
-# specify the section cluster
-# set to NULL to just summarise by adherence variable
-section_cluster <- NULL#'B1'
 
 if (is.null(section_cluster)) {
   section_cluster_levs <- NULL
@@ -47,6 +43,14 @@ for (section in c(likert_sections, 'A', 'B2', 'C', 'E1', 'F1', 'Demographics')) 
 }
 
 if (is.null(section_cluster)) {
+  # counts in each adherence group
+  data_section_clusters %>%
+    group_by(adherence) %>%
+    count() %>%
+    ungroup() %>%
+    mutate(`n (%)` = str_c(n, ' (', round(100*n/sum(n),0), '%)')) %>%
+    select(-n) %>%
+    print(n=Inf)
   
   data_clusters <- data_section_clusters %>%
     mutate(cluster = factor(adherence,
@@ -59,6 +63,18 @@ if (is.null(section_cluster)) {
     mutate(colour_var = 'most positive')
   
 } else if ((length(section_cluster) == 1) && (section_cluster %in% likert_sections)) {
+  
+  # counts in each adherence group x section cluster
+  cluster_name <- str_c(section_cluster, '_cluster')
+  data_section_clusters %>%
+    rename(cluster = cluster_name) %>%
+    group_by(adherence, cluster) %>%
+    count() %>%
+    ungroup(cluster) %>%
+    filter(!is.na(cluster)) %>%
+    mutate(`n (%)` = str_c(n, ' (', round(100*n/sum(n),0), '%)')) %>%
+    select(-n) %>%
+    print(n=Inf)
   
   cluster_var <- str_c(section_cluster, 'cluster', sep = '_')
   data_clusters <- data_section_clusters %>%

@@ -6,7 +6,7 @@ output: word_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = FALSE, include = FALSE)
+knitr::opts_chunk$set(echo = FALSE, include = FALSE, message = FALSE, warning = FALSE)
 ```
 
 ```{r set_directory}
@@ -20,6 +20,7 @@ corr_plot_path <- file.path(results_path, 'corr_plots')
 ```
 
 ```{r update_corr_plots}
+# if correlation plots have already been generated and just editing text, set to FALSE as will be much quicker
 update_corr_plots <- TRUE
 ```
 

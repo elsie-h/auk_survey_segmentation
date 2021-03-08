@@ -8,7 +8,6 @@ source(file.path(functions_path,'corr_plot.R'))
 data <- foreign::read.spss(file.path(data_path,'Asthma condition management survey - SPSS v2.0.sav')) %>%
   as_tibble() %>%
   mutate_if(is.factor, as.character) %>%
-# data <- readr::read_csv(file = file.path(data_path, 'Asthma condition management survey - LABEL.csv')) %>%
   # remove first row as questions
   slice(-1) %>%
   # all as lower case
@@ -19,7 +18,9 @@ data <- foreign::read.spss(file.path(data_path,'Asthma condition management surv
 survey_key <- readxl::read_excel(path = file.path('data', 'Asthma condition management survey - MAP.xlsx'), 
                                  range = 'B1:C242') %>%
   rename(variable_label = Variable, survey_question = Label) %>%
+  # correct typo
   mutate_at('variable_label', list(~ if_else(. %in% 'rev_attitudes2', 'prev_attitudes2', .))) %>%
+  # create column to indicate survey section
   mutate(section = case_when(str_detect(variable_label, '^asthma_diagnosis')
                              ~ 'A',
                              str_detect(variable_label, '^health|^realise')
@@ -66,7 +67,7 @@ saveRDS(survey_key,
         file = file.path(data_path, 'survey_key.RDS'),
         compress = FALSE)
 
-# likert
+# define likert levels
 likert_levs <- c('strongly disagree', 'disagree', 'neutral', 'agree', 'strongly agree')
 freq_levs <- c('never', 'rarely', 'sometimes', 'often', 'always')
 
@@ -75,8 +76,6 @@ levs_check <- sapply(names(data),
                      function(x)
                        all(unique(data[,x][[1]]) %in% c(likert_levs, NA_character_))|
                        all(unique(data[,x][[1]]) %in% c(freq_levs, NA_character_)))
-
-
 
 likert_vars <- names(levs_check)[levs_check]
 inhaler_vars <- likert_vars[str_detect(likert_vars, '^prev_')|
@@ -93,6 +92,7 @@ data <- data %>%
                            'skip',
                            .)))
 
+# store in list for later use
 likert_list <- list(likert_levs = likert_levs,
                     freq_levs = freq_levs,
                     likert_vars = likert_vars, 
@@ -111,15 +111,6 @@ demographics <- data %>%
                    'profile_GOR',
                    'profile_education_level')), 
             factor) %>%
-  # low counts in most categories so for now categorise as white/other
-  # look in more detail later
-  mutate_at('ethnicity_new', 
-            list(~ factor(case_when(. %in% 'english / welsh / scottish / northern irish / british'|
-                               . %in% 'irish'|
-                               . %in% 'any other white background'
-                             ~ 'white',
-                             TRUE ~ 'other'),
-                          levels = c('white', 'other')))) %>%
   mutate_at('profile_gross_household',
             list(~ factor(case_when(is.na(.) ~ 'prefer not to answer',
                                     TRUE ~ str_replace_all(., '\xa3', '£')),

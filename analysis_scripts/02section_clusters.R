@@ -1,4 +1,4 @@
-# Identify section-specific clusters
+# Identify section-specific clusters (see report for details)
 # Plot a summary of the section variables each of the section clusters
 # Store the section clusters in a dataset for later use
 
@@ -8,12 +8,9 @@ data_clean <- readRDS(file = file.path(data_path, 'data_clean.RDS'))
 survey_key <- readRDS(file = file.path(data_path, 'survey_key.RDS'))
 
 source(file.path(functions_path, 'combine_likert.R'))
-source(file.path(functions_path, 'theme_bar_allvars.R'))
 source(file.path(functions_path, 'my_line_plot.R'))
 
 sections <- sort(unique(survey_key$section))
-
-stable_threshold <- 0.85
 
 likert_sections <- c('B1', 'D1', 'D2', 'E2', 'F2')
 
@@ -23,13 +20,11 @@ data_all_clusters <- data_clean %>% select(RecordNo, adherence)
   # loop over all sections
   for (sec in likert_sections) {
     
-    
     vars_section <- survey_key %>% 
       filter(section %in% sec) %>%
       select(variable_label) %>%
       unlist() %>% 
       unname()
-    
     
     data_a <-  data_clean %>%
       filter_at(vars( all_of(vars_section)),
@@ -49,20 +44,20 @@ data_all_clusters <- data_clean %>% select(RecordNo, adherence)
     }
     
     
-    # MCA
-    # if the levels are not strongly dis -> strongly agree,
-    # map to for combining cats, then map back
-      mca_data <- combine_likert(data = data_a %>%
-                                   mutate_at(vars(all_of(vars_section)), as.character),
-                                 vars = vars_section)
+    # MCA to reduce to 2 dimensions
+    # the choice of 2 dimensions is based on exploratory analysis not included in this repository
+    mca_data <- combine_likert(data = data_a %>%
+                                 mutate_at(vars(all_of(vars_section)), as.character),
+                               vars = vars_section)
     
     mca_res <- MCA(mca_data %>%
                      dplyr::select(-RecordNo), 
                    ncp = 2, 
                    graph = FALSE)
     
-    
+    # calculate MCA scores
     scores <- as_tibble(mca_res$ind$coord)
+    # calculate squared Euclidean distances
     d <- dist(x = scores)^2
     
     # clusterboot
@@ -70,7 +65,6 @@ data_all_clusters <- data_clean %>% select(RecordNo, adherence)
     cluster_res_list[[1]] <- NA_real_
     sil_res <- numeric()
     sil_res[1] <- NA_real_
-    # the choice of 3 clusters for k-means is based on exploratory analysis not included in this repository
     for (x in 3) {
       clusterboot_res <- clusterboot(data = scores,
                                      B=100,
@@ -82,7 +76,8 @@ data_all_clusters <- data_clean %>% select(RecordNo, adherence)
                                      dissolution = 0.5,
                                      recover = 0.75,
                                      seed = seed)
-      if (all(clusterboot_res$bootmean > stable_threshold)) {
+      # calculate silhouette widths if all three clusters have average Jaccard coefficient > 0.85
+      if (all(clusterboot_res$bootmean > 0.85)) {
         cluster_res_list[[x]] <- clusterboot_res$result$result$cluster
         sil_res[x]  <- summary(silhouette(x = clusterboot_res$result$result$cluster, dist = d))$avg.width
       } else {
@@ -90,7 +85,7 @@ data_all_clusters <- data_clean %>% select(RecordNo, adherence)
         cluster_res_list[[x]] <- NA_real_
       }
     }
-    
+    # if average silhouette widths >0.5 store section clusters
     if (max(sil_res, na.rm=TRUE) > 0.5) {
       k <- which(sil_res ==  max(sil_res, na.rm=TRUE))
       data_clusters <- data_a %>%
@@ -125,6 +120,8 @@ data_all_clusters <- data_clean %>% select(RecordNo, adherence)
                                            levels = cluster_labs$cluster,
                                            labels = cluster_labs$cluster_lab)))
       
+      # relabel clusters so that all are ordered in the following order:
+      cluster_labels <- c('least positive', 'middle positive', 'most positive')
       # this relabelling is based on exploratory analysis that is not inlcluded in this repository
       cluster_levels <- switch(sec,
                                B1 = c(2,3,1),
@@ -133,14 +130,13 @@ data_all_clusters <- data_clean %>% select(RecordNo, adherence)
                                E2 = c(3,2,1),
                                F2 = c(1,2,3))
       
-      cluster_labels <- c('least positive', 'middle positive', 'most positive')
-      
       data_all_clusters <- data_all_clusters %>%
         mutate_at(all_of(cluster_name),
                   list(~ factor(as.numeric(.), 
                                 labels = cluster_labels,
                                 levels = cluster_levels)))
       
+      # plot a summary of all questions in section across the three clusters
       plot_data %>%
         mutate_at('cluster',
                   list(~ factor(as.numeric(.),
