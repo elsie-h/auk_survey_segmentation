@@ -21,6 +21,6 @@ seed <- 546
 
 keep_objects <- c('directory', ls()[str_detect(ls(), 'path$')], 'keep_objects', 'seed')
 
-cat(str_c('Check that the following folders are in ', data_path, ':\n',
+cat(str_c('Check that the following files are in ', data_path, ':\n',
             'Asthma condition management survey - SPSS v2.0.sav\n',
             'Asthma condition management survey - MAP.xlsx'))
