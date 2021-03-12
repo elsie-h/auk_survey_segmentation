@@ -12,7 +12,7 @@ functions_path <- file.path(directory, 'functions')
 
 # create data and results folders if they don't already exist
 # (as they are empty so not included in public github repo)
-for (x_path in c('data_path', 'results_path')) {
+for (x_path in c(data_path, results_path)) {
   res_path <- file.path(results_path, x_path)
   if (!dir.exists(res_path)) dir.create(res_path)
 }
